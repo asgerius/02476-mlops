@@ -6,25 +6,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from pelutils import log, TT
+from pelutils import TT, log
 
-from data import load_data
-from model import MnistModel
-from utils import device
+from src import device
+from src.data import load_data
+from src.models import MnistModel
+from src.models.predict_model import eval
 
-
-def eval(model: MnistModel, test_x: torch.Tensor, test_y: torch.Tensor) -> tuple[float, float]:
-    TT.profile("Eval")
-    model.eval()
-    pred = model(test_x)
-    loss = nn.CrossEntropyLoss()(pred, test_y)
-    pred_index = pred.argmax(dim=1)
-    acc = (pred_index == test_y).float().mean()
-
-    model.train()
-    TT.end_profile()
-
-    return loss.item(), acc
 
 def train(lr: float, batch_size: int, train_x: torch.Tensor, train_y: torch.Tensor, test_x: torch.Tensor, test_y: torch.Tensor):
 
@@ -57,7 +45,7 @@ def train(lr: float, batch_size: int, train_x: torch.Tensor, train_y: torch.Tens
         log("Test loss: %.6f" % test_loss, "Test acc: %.2f %%" % (100 * test_acc))
 
     log("Save model")
-    torch.save(model.state_dict(), "mnist-model.pt")
+    torch.save(model.state_dict(), "models/mnist-model.pt")
 
 
 if __name__ == "__main__":
@@ -68,11 +56,10 @@ if __name__ == "__main__":
         parser = ArgumentParser()
         parser.add_argument("--lr", type=float, default=1e-3)
         parser.add_argument("--batch_size", type=int, default=100)
-        parser.add_argument("--eval", action="store_true")
         args = parser.parse_args()
 
         log("Load data")
-        train_x, train_y, test_x, test_y = load_data("../../corruptmnist")
+        train_x, train_y, test_x, test_y = load_data("data/external/corruptmnist")
         log(
             f"Train images: {train_x.shape}",
             f"Train labels: {train_y.shape}",
@@ -80,12 +67,5 @@ if __name__ == "__main__":
             f"Test labels:  {test_y.shape}",
         )
 
-        if args.eval:
-            log.section("Evaluting saved model")
-            model = MnistModel()
-            model.load_state_dict(torch.load("mnist-model.pt"))
-            test_loss, test_acc = eval(model, test_x, test_y)
-            log("Test loss: %.6f" % test_loss, "Test acc: %.2f %%" % (100 * test_acc))
-        else:
-            log.section("Training new model")
-            train(args.lr, args.batch_size, train_x, train_y, test_x, test_y)
+        log.section("Training new model")
+        train(args.lr, args.batch_size, train_x, train_y, test_x, test_y)
